@@ -1,4 +1,6 @@
 import pandas as pd
+import time
+
 
 def filter_df_by_date(df, min_date, max_date, time_column='Time', date_format='%Y-%m-%d %H:%M:%S'):
     """
@@ -127,3 +129,17 @@ def get_min_max_dates(df, time_column='Time',input_format = '%Y-%m-%d %H:%M:%S',
 
 # print("Min date:", min_date)
 # print("Max date:", max_date)
+
+
+# Tic function to start timing
+def tic():
+    global start_time
+    start_time = time.time()
+
+# Toc function to stop timing and print the elapsed time
+def toc():
+    if 'start_time' in globals():
+        elapsed_time = time.time() - start_time
+        print(f"Elapsed time: {elapsed_time:.6f} seconds")
+    else:
+        print("Tic has not been called yet!")

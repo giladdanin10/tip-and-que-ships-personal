@@ -46,7 +46,11 @@ def filter_df(df, filter_dic):
             else:
                 df = df[df[column] == value]
         elif operator == '!=':
-            df = df[df[column] != value]
+            if isinstance(value, list):
+                df = df[~df[column].isin(value)]
+            else:
+                df = df[df[column] != value]
+
         elif operator == '<':
             df = df[df[column] < value]
         elif operator == '<=':
@@ -85,7 +89,7 @@ def repeat_single_value_in_column (df,value,column_name,to_print=False):
     return df
 
 
-def export_df(self,df, out_file_name, columns=None, start_line=0, num_lines=None):
+def export_df(df, out_file_name, columns=None, start_line=0, num_lines=None):
     """
     Exports a subset of a DataFrame to an Excel file.
 

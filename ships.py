@@ -83,12 +83,19 @@ class SHIPS:
             # trim spaces from Vessel_name
             df['name'] = df['name'].apply(lambda x: str(x).strip() if isinstance(x, str) else x)
 
+            # make sure the time related columns are indeed in datetime format
             df['position_timestamp'] = pd.to_datetime(df['position_timestamp'])
             df['static_timestamp'] = pd.to_datetime(df['static_timestamp'])
 
+            # chnage df['name'] = Nan to 'Nan' 
+            ind_name_nan = df['name'].isna()
+            df.loc[ind_name_nan,'name'] = 'Nan'
 
-            df.rename(columns={'position_timestamp': 'time'}, inplace=True)
+            # add time columm as the position_timestamp 
+            # df.rename(columns={'position_timestamp': 'time'}, inplace=True)
+            df['time'] = df['position_timestamp']
 
+            # add numeric time column
             df['time_seconds'] = df['time'].astype('int64')/10**9
 
 

@@ -94,3 +94,4 @@ def plot_multiple_y_axes(df, columns=None, axes=None, x_column='index', fig_size
     fig.tight_layout()
 
     plt.show()
+

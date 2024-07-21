@@ -14,7 +14,7 @@ import geopandas as gpd
 from shapely.geometry import Point
 import sys
 from IPython.display import display
-
+from parse_aux import *
 
 
 
@@ -119,12 +119,6 @@ class SHIPS:
         return df
 
 
-    def get_mmsi_df(self,df,mmsi,sort_columns=None):
-        df_filt = df.loc[df['mmsi']==mmsi]
-        return df_filt
-
-    # def plot_mmsi_data(self,df,mmsi=[],fig_size):
-    #     plot_multiple_y_axes(df,['latitude','longitude'],x_column='time',fig_size=(8,5))        
 
 
     def check_pkl_files_exists(self,save_folder = './pkl'):
@@ -139,6 +133,137 @@ class SHIPS:
 
 
 
+# data_structure can be either a df or a dictionary of dfs
+    def get_ship_df(self,data_structure,item,**params):
+        default_params = {
+            'item_type': {'default': 'name', 'optional': {'name','mmsi'}},
+            'sort_columns':{'default':None}
+        }
+
+        params = parse_func_params(params, default_params)
+
+
+
+        if (isinstance(data_structure,dict)):
+            df_filt = data_structure[item]
+        else:
+            df_filt = data_structure.loc[data_structure[params['item_type']]==item]
+
+
+        # df_filt = handle_common_time_rows_in_df(df_filt,ID_columns=item_type)
+
+        if (params['sort_columns'] is not None):
+            parse_parameter(params['sort_columns'],data_structure.columns)        
+
+            df_filt = df_filt.sort_values(by=params['sort_columns'])
+
+        return df_filt
+
+
+
+    # def get_ship_data_stats(ship_data,item_type=None,id_column_check=[]):
+    def get_ship_data_stats(self,ship_data,**params):
+        default_params = {
+            'item_type': {'default': 'name', 'optional': {'name','mmsi'}},
+        'id_column_check': {'default': []}
+    }
+
+        try:
+            params = parse_func_params(params, default_params)
+        except ValueError as e:
+            print(e)  # Print the exception message with calling stack path
+            return None
+
+
+        if (not isinstance(params['id_column_check'],list)):
+            params['id_column_check'] = [params['id_column_check']]
+
+        stats_dic = {
+            params['item_type']:ship_data[params['item_type']].unique().tolist(),
+            'len': [ship_data.shape[0]],  # Scalar value wrapped in a list
+            'min_time':min(ship_data['time']),
+            'max_time':max(ship_data['time']),
+            'total_time':max(ship_data['time'])- min(ship_data['time']),
+            'min_time_diff[mins]': round(np.min(time_diff_convert(ship_data['time'].diff()))),
+            'max_time_diff[mins]': round(np.max(time_diff_convert(ship_data['time'].diff()))),
+            'mean_time_diff[mins]': round(np.mean(time_diff_convert(ship_data['time'].diff()))),
+            'min_longitude':(min(ship_data['longitude'])),
+            'max_longitude':(max(ship_data['longitude'])),
+            'min_latitude':(min(ship_data['latitude'])),
+            'max_latitude':(max(ship_data['latitude'])),
+        }
+        stats_dic['span_longitude']  = stats_dic['max_longitude']-stats_dic['min_longitude']
+        stats_dic['span_latitude']  = stats_dic['max_latitude']-stats_dic['min_latitude']
+
+        for column in params['id_column_check']:
+            stats_dic[f'num_{column}s'] = ship_data[column].unique().shape[0]
+
+
+
+        return stats_dic
+
+
+
+    # def create_info_df(df,num_lines = None,item_type='mmsi',id_column_check='name'):
+    def create_info_df(self,df,**params):
+        default_params = {
+            'item_type': {'default': 'name', 'optional': {'name','mmsi'}},
+            'num_lines': {'default': None},
+            'id_column_check': {'default': []}
+        }
+
+        try:
+            params = parse_func_params(params, default_params)
+        except ValueError as e:
+            print(e)  # Print the exception message with calling stack path
+            return None
+
+        print ('create item_dic')
+        groups = df.groupby(params['item_type'])
+        item_dict = {name: group for name, group in groups}
+
+        print('create info_df')
+
+        info_df = pd.DataFrame()
+        prob_mmsi = []
+        item_list = df[params['item_type']].unique()
+
+        if (params['num_lines'] != None):
+            item_list = item_list[:params['num_lines']]
+
+
+        for i, item in enumerate(item_list):
+            
+            if (i % 1000 == 0):
+                print(f"processing {params['item_type']} {i} out of {len(item_list)}")
+            # ship_data = get_item_df(item_dict,item,item_type=item_type)  # Assuming get_ship_data is defined elsewhere
+            ship_data = self.get_ship_df(item_dict,item,**params)  # Assuming get_ship_data is defined elsewhere
+
+
+            item = ship_data[params['item_type']].iloc[0]
+
+            if (ship_data.shape[0]==1):
+                continue
+            
+            try:
+                # ships_df_line = pd.DataFrame(get_ship_data_stats(ship_data,item_type=item_type,id_column_check=id_column_check),index=[item])
+                ships_df_line = pd.DataFrame(self.get_ship_data_stats(ship_data,**params),index=[item])
+
+            except Exception as e:
+                # Print the exception message
+                print(item)
+                print(f"An error occurred: {e}")
+                # Optionally, you can log the error or perform other actions here
+                # Exit the program
+                sys.exit(1)
+
+
+            info_df = pd.concat([info_df, ships_df_line])
+
+        info_df = info_df.sort_values(by='len', ascending=False)
+
+        # info_df = info_df.reset_index(drop=True)
+        return info_df
 
 
 
@@ -177,75 +302,75 @@ class SHIPS:
 
 
 
-    def create_data_dic(self,df,vessel_names = None,vessel_data_length_thresh=5,save_folder = './pkl',reload_level=0):
-        print ('create_data_dic')
-        print ('----------------')
+    # def create_data_dic(self,df,vessel_names = None,vessel_data_length_thresh=5,save_folder = './pkl',reload_level=0):
+    #     print ('create_data_dic')
+    #     print ('----------------')
 
-        data_dic_file_name = save_folder+'/data_dic.pkl'
-        info_df_file_name = save_folder+'/info_df.pkl'
-        prob_dic_file_name = save_folder+'/prob_dic.pkl'
-        status = True
+    #     data_dic_file_name = save_folder+'/data_dic.pkl'
+    #     info_df_file_name = save_folder+'/info_df.pkl'
+    #     prob_dic_file_name = save_folder+'/prob_dic.pkl'
+    #     status = True
 
         
 
-        if (reload_level>=3) and self.check_pkl_files_exists(save_folder):   
-            self.data_dic,status = load_var(data_dic_file_name)
-            self.info_df_dic,status = load_var(info_df_file_name)
-            self.prob_dic,status = load_var(prob_dic_file_name)
-            return self.data_dic,status
+    #     if (reload_level>=3) and self.check_pkl_files_exists(save_folder):   
+    #         self.data_dic,status = load_var(data_dic_file_name)
+    #         self.info_df_dic,status = load_var(info_df_file_name)
+    #         self.prob_dic,status = load_var(prob_dic_file_name)
+    #         return self.data_dic,status
 
-        else:
-            df_filt_file_name = save_folder + '/df_filt.pkl'
-            if (df is None):
-                df,status = load_df_from_file(df_filt_file_name)
+    #     else:
+    #         df_filt_file_name = save_folder + '/df_filt.pkl'
+    #         if (df is None):
+    #             df,status = load_df_from_file(df_filt_file_name)
 
-            self.info_df = pd.DataFrame()
-    # prepare prob_dic
-            self.prob_dic['name'] = {}
+    #         self.info_df = pd.DataFrame()
+    # # prepare prob_dic
+    #         self.prob_dic['name'] = {}
 
-            ID_columns = ['IMO','Ship_Type']
-            for ID_column in ID_columns:
-                self.prob_dic['name'][ID_column] = {'none':[],'multiple':[]}
+    #         ID_columns = ['IMO','Ship_Type']
+    #         for ID_column in ID_columns:
+    #             self.prob_dic['name'][ID_column] = {'none':[],'multiple':[]}
 
-            self.prob_dic['name']['short'] = []
+    #         self.prob_dic['name']['short'] = []
 
-    # group by Vessel_Name
-            grouped = df.groupby('name')
-            self.data_dic = {Vessel_Name: group for Vessel_Name, group in grouped}    
+    # # group by Vessel_Name
+    #         grouped = df.groupby('name')
+    #         self.data_dic = {Vessel_Name: group for Vessel_Name, group in grouped}    
 
 
-            good_list = []
-    # make complete missing data at lines containing nans at certain colums
-            if (vessel_names is None):
-                vessel_names = self.data_dic.keys()
+    #         good_list = []
+    # # make complete missing data at lines containing nans at certain colums
+    #         if (vessel_names is None):
+    #             vessel_names = self.data_dic.keys()
                 
-            for i,Vessel_Name in enumerate(vessel_names):
-                if (i % 100 == 0):
-                    print(f'processing Vessel_Name {i} out of {len(self.data_dic.keys())}')
+    #         for i,Vessel_Name in enumerate(vessel_names):
+    #             if (i % 100 == 0):
+    #                 print(f'processing Vessel_Name {i} out of {len(self.data_dic.keys())}')
 
-                vessel_data = self.data_dic[Vessel_Name]
+    #             vessel_data = self.data_dic[Vessel_Name]
 
-    # prepare the vessel_data                            
-                self.data_dic[Vessel_Name],status = self.prepare_vessel_data(vessel_data,ID_columns=ID_columns)            
+    # # prepare the vessel_data                            
+    #             self.data_dic[Vessel_Name],status = self.prepare_vessel_data(vessel_data,ID_columns=ID_columns)            
                 
-                if (self.data_dic[Vessel_Name].shape[0]<vessel_data_length_thresh):
-                    self.prob_dic['name']['short'].append(Vessel_Name)
-                    continue
-    # get some statistics             
-                vessels_df_line = pd.DataFrame(self.get_vessel_data_stats(vessel_data), index=[Vessel_Name])
-                self.info_df = pd.concat([self.info_df,vessels_df_line])
+    #             if (self.data_dic[Vessel_Name].shape[0]<vessel_data_length_thresh):
+    #                 self.prob_dic['name']['short'].append(Vessel_Name)
+    #                 continue
+    # # get some statistics             
+    #             vessels_df_line = pd.DataFrame(self.get_vessel_data_stats(vessel_data), index=[Vessel_Name])
+    #             self.info_df = pd.concat([self.info_df,vessels_df_line])
 
-            save_var(self.data_dic,data_dic_file_name)            
-            save_var(self.info_df,info_df_file_name)  
-            save_var(self.prob_dic,prob_dic_file_name)                    
+    #         save_var(self.data_dic,data_dic_file_name)            
+    #         save_var(self.info_df,info_df_file_name)  
+    #         save_var(self.prob_dic,prob_dic_file_name)                    
 
-            # # remove_problematic_parts if desired
-            # if (remove_problematic_parts):
-            #     filter_dic = {'name':['==',good_list]}
-            #     df = filter_df(df,filter_dic)  
+    #         # # remove_problematic_parts if desired
+    #         # if (remove_problematic_parts):
+    #         #     filter_dic = {'name':['==',good_list]}
+    #         #     df = filter_df(df,filter_dic)  
 
             
-            return status
+    #         return status
 
 
 
@@ -470,107 +595,6 @@ class SHIPS:
     #     self.prob_MMSI = prob_MMSI
 
     #     return self.info_df,prob_MMSI  # Corrected return statement
-
-    def create_info_df(self, df,min_data_len_thresh=2,to_print = True,num_lines = None):
-        print('create info_df')
-
-        self.info_df = pd.DataFrame()
-        prob_Vessel_Name = []
-        Vessel_Name_list = df['name'].unique()
-
-        if (num_lines != None):
-            Vessel_Name_list = Vessel_Name_list[:num_lines]
-
-
-
-        for i, vessel_Name in enumerate(Vessel_Name_list):
-            if (i % 1000 == 0):
-                print(f'processing Vessel_Name {i} out of {len(Vessel_Name_list)}')
-            vessel_data = self.get_vessel_data(df,vessel_Name)  # Assuming get_vessel_data is defined elsewhere
-
-            if (vessel_data.shape[0] < min_data_len_thresh):
-                prob_Vessel_Name.append(vessel_Name)
-            else:
-                Vessel_Name = vessel_data['name'].iloc[0]
-                try:
-                    vessels_df_line = pd.DataFrame(self.get_vessel_data_stats(df,Vessel_Name),index=[Vessel_Name])
-                    
-                except Exception as e:
-                    # Print the exception message
-                    print(vessel_Name)
-                    print(f"An error occurred: {e}")
-                    # Optionally, you can log the error or perform other actions here
-                    # Exit the program
-                    sys.exit(1)
-
-
-                self.info_df = pd.concat([self.info_df, vessels_df_line])
-
-        self.info_df = self.info_df.sort_values(by='len', ascending=False)
-
-        if (to_print):
-            print (f"total number of Vessel_Name:{len(Vessel_Name_list)}")
-            print (f"{self.info_df.shape[0]} Vessel_Name's passed")
-            print (f"{len(prob_Vessel_Name)} Vessel_Name's failed")
-
-
-        self.prob_Vessel_Name = prob_Vessel_Name
-
-        return self.info_df,prob_Vessel_Name  # Corrected return statement
-
-
-    def create_info_df1(self, df,min_data_len_thresh=2,to_print = True,num_lines = None):
-        print('create info_df')
-
-        self.info_df = pd.DataFrame()
-        prob_Vessel_Name = []
-        Vessel_Name_list = df['name'].unique()
-
-        if (num_lines != None):
-            Vessel_Name_list = Vessel_Name_list[:num_lines]
-
-
-
-        for i, vessel_Name in enumerate(Vessel_Name_list):
-            if (i % 1000 == 0):
-                print(f'processing Vessel_Name {i} out of {len(Vessel_Name_list)}')
-            vessel_data = self.get_vessel_data(df,vessel_Name)  # Assuming get_vessel_data is defined elsewhere
-
-            if (vessel_data.shape[0] < min_data_len_thresh):
-                prob_Vessel_Name.append(vessel_Name)
-            else:
-                Vessel_Name = vessel_data['name'].iloc[0]
-                try:
-                    vessels_df_line = pd.DataFrame(self.get_vessel_data_stats1(vessel_data),index=[Vessel_Name])
-                    
-                except Exception as e:
-                    # Print the exception message
-                    print(vessel_Name)
-                    print(f"An error occurred: {e}")
-                    # Optionally, you can log the error or perform other actions here
-                    # Exit the program
-                    sys.exit(1)
-
-
-
-
-
-
-
-                self.info_df = pd.concat([self.info_df, vessels_df_line])
-
-        self.info_df = self.info_df.sort_values(by='len', ascending=False)
-
-        if (to_print):
-            print (f"total number of Vessel_Name:{len(Vessel_Name_list)}")
-            print (f"{self.info_df.shape[0]} Vessel_Name's passed")
-            print (f"{len(prob_Vessel_Name)} Vessel_Name's failed")
-
-
-        self.prob_Vessel_Name = prob_Vessel_Name
-
-        return self.info_df,prob_Vessel_Name  # Corrected return statement
-
 
 
 

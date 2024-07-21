@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from convert_aux import * 
 import convert_aux as CONVERT
-
+from time_aux import *
 def filter_df(df, filter_dic):
     """
     Filters a DataFrame based on a dictionary of column filters.
@@ -126,3 +126,65 @@ def export_df(df, out_file_name, columns=None, start_line=0, num_lines=None):
         subset_df.to_csv(out_file_name, index=False)
 
 
+def handle_common_time_rows_in_df(df, time_column='time', ID_columns=[]):
+
+    # handle a none list input 
+    if (not isinstance(ID_columns,list)):
+        ID_columns = [ID_columns]
+
+    # Check if the specified columns exist in the DataFrame
+    missing_columns = [col for col in ID_columns + [time_column] if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing columns in DataFrame: {', '.join(missing_columns)}")
+    
+    # Initialize a counter for the number of common time chunks found
+    common_time_chunks_count = 0
+    
+    # Get the total number of chunks
+    total_chunks = df.groupby(ID_columns).ngroups
+    
+    # Function to handle rows with common time values in chunks defined by ID_columns
+    def combine_rows(chunk, chunk_number):
+        nonlocal common_time_chunks_count
+        
+        # Sort the chunk by the time_column
+        chunk = chunk.sort_values(by=time_column)
+        
+        # Calculate the time differences in seconds
+        time_diff = chunk[time_column].diff()
+        time_diff = time_diff_convert(time_diff, units='secs')
+        zero_diff_line_numbers = np.where(time_diff == 0)[0]
+        
+        # Initialize a list to hold the indices of rows to be dropped
+        indices_to_drop = []
+        
+        # Iterate over the indices with zero time differences and combine rows
+        for line_number in zero_diff_line_numbers:
+            # Ensure we have at least two rows to combine
+            if line_number > 0:
+                combined_row = chunk.iloc[line_number].combine_first(chunk.iloc[line_number - 1])
+                
+                # Place the combined row at the index of the first row in the group
+                first_index = chunk.index[line_number - 1]
+                df.loc[first_index] = combined_row
+                
+                # Add the index of the current row to the drop list
+                indices_to_drop.append(chunk.index[line_number])
+                
+                common_time_chunks_count += 1  # Increment the counter
+        
+        # Drop the rows that have been combined
+        if (len(indices_to_drop)!=0):
+            df.drop(indices_to_drop, inplace=True)
+        
+        # Print progress every 1000 chunks
+        if chunk_number % 10 == 0:
+            print(f"Processed chunk {chunk_number} out of {total_chunks}")
+
+    # Apply the function to each group defined by ID_columns
+    for chunk_number, (_, chunk) in enumerate(df.groupby(ID_columns, group_keys=False), start=1):
+        combine_rows(chunk, chunk_number)
+
+    print(f"Number of common time chunks found: {common_time_chunks_count}")
+    
+    return df

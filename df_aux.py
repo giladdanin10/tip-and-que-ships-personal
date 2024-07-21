@@ -188,3 +188,52 @@ def handle_common_time_rows_in_df(df, time_column='time', ID_columns=[]):
     print(f"Number of common time chunks found: {common_time_chunks_count}")
     
     return df
+
+
+import pandas as pd
+
+def normalize_columns(df, columns, method='min-max', add_norm_columns=True):
+    """
+    Normalize specified columns in a DataFrame.
+
+    Parameters:
+    df (pd.DataFrame): The DataFrame containing the columns to be normalized.
+    columns (list or str): A list of column names or a single column name to normalize.
+    method (str): The normalization method to use ('min-max' or 'z-score').
+    add_norm_columns (bool): If True, adds normalized columns with suffix '_norm'. If False, replaces the original columns.
+
+    Returns:
+    pd.DataFrame: The DataFrame with normalized columns.
+    """
+    # Ensure columns is a list
+    if isinstance(columns, str):
+        columns = [columns]
+    
+    df_normalized = df.copy()
+    
+    for column in columns:
+        if method == 'min-max':
+            norm_col = (df[column] - df[column].min()) / (df[column].max() - df[column].min())
+        elif method == 'z-score':
+            norm_col = (df[column] - df[column].mean()) / df[column].std()
+        else:
+            raise ValueError("Method must be 'min-max' or 'z-score'")
+        
+        if add_norm_columns:
+            df_normalized[column + '_norm'] = norm_col
+        else:
+            df_normalized[column] = norm_col
+    
+    return df_normalized
+
+# # Sample DataFrame
+# data = {
+#     'value1': [10, 20, 30, 40, 50],
+#     'value2': [5, 15, 25, 35, 45],
+#     'value3': [2, 4, 6, 8, 10]
+# }
+# df = pd.DataFrame(data)
+
+# # Normalize specified columns and add normalized columns
+# columns_to_normalize = ['value1', 'value2']
+# method = 'min-max'

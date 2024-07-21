@@ -15,6 +15,7 @@ from shapely.geometry import Point
 import sys
 from IPython.display import display
 from parse_aux import *
+from plot_aux import *
 
 
 
@@ -268,7 +269,64 @@ class SHIPS:
 
 
 
+    def plot_ship_data(self,df,ship_names,**params):
+        default_params = {
+            'columns': {'default': ['latitude','longitude']},
+            'x_data_type': {'default': 'index', 'optional': {'index', 'time'}},
+            'marker_points': {'default': None},
+            'marker_points_style': {'default': 'o', 'optional': {'o', 'x', 's', 'd', 'ro'}},
+            'marker_style': {'default': None, 'optional': {None, 'o', 'x', 's', 'd'}},
+            'line_style': {'default': '-', 'optional': {'-', '--', '-.', ':'}},
+            'line_styles': {'default': None},  # Adding support for multiple line styles
+            'x_label': {'default': 'Index'},
+            'y_label': {'default': 'Value'},
+            'xlim': {'default': None},
+            'ylim': {'default': None},
+            'title': {'default': 'Plot of Data'},
+            'legend': {'default': True, 'optional': {True, False}},
+            'legend_loc': {'default': 'upper right', 'optional': {'best', 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'}},
+            'figsize': {'default': None},
+            'color': {'default': None},
+            'time_column':'time',
+            'axes_size':(3, 2),
+            'sort_columms': None,
+            'pre_process': None,
+        }
+        try:
+            params = parse_func_params(params, default_params)
+        except ValueError as e:
+            print(e)  # Print the exception message with calling stack path
+            return None
 
+
+        if params['columns'] is None:
+            raise ValueError("columns is empty")
+        
+        elif not isinstance(ship_names,list):
+            ship_names = [ship_names]
+
+        fig, axes = create_subplot_scheme(axes_size=params['axes_size'], num_axes=len(ship_names))
+
+
+        for i, ax in enumerate(axes):
+            if i > len(ship_names):
+                break
+
+            # Assuming 'ships.get_item_df' is a function to filter the DataFrame by item
+            df_filt = self.get_ship_df (df, ship_names[i],**params)
+
+            plot_params = params
+            plot_params['ax'] = ax
+            plot_params['title'] = ship_names[i]
+            if (params['pre_process']=='remove_bias'):
+                for column in params['columns']:
+                    df_filt.loc[:, column] = df_filt[column] - df_filt[column].mean()
+
+
+            plot_df_columns(df_filt,**plot_params)
+        
+# usage
+# plot_ship_data(df,info_df.index[range(4)].tolist(),columns=['latitude', 'longitude'],ylim = [-90,90],pre_process='remove_bias')
 
 
 

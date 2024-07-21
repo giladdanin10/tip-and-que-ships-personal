@@ -10,33 +10,31 @@ import matplotlib.pyplot as plt
 from itertools import cycle
 
 
-def parse_func_params(params, default_params):
-    parsed_params = {}
+# 
 
-    # Get the name of the calling function
-    calling_func_name = inspect.currentframe().f_back.f_code.co_name
-    
-    # Validate and parse each parameter
-    for param_name, param_info in default_params.items():
-        if isinstance(param_info, dict):
-            default_value = param_info.get('default')
-            allowed_values = param_info.get('optional', [])
-        else:
-            default_value = param_info
-            allowed_values = []
 
-        if param_name in params:
-            param_value = params[param_name]
-        else:
-            param_value = default_value
 
-        # Validate parameter value against allowed_values if provided
-        if allowed_values and param_value not in allowed_values:
-            raise ValueError(f"{calling_func_name}: Invalid value '{param_value}' for parameter '{param_name}'. Allowed values are {sorted(allowed_values)}.")
 
-        parsed_params[param_name] = param_value
+# # Example usage:
+# y = np.sin(np.linspace(0, 10, 100))
+# plot(np.arange(100), y),
+#      marker_points=np.array([10, 20, 30]), marker_points_style='ro',
+#      marker_style='x', line_style='--', x_label='X-axis',
+#      y_label='Y-axis', xlim=(0, 100), ylim=(-1, 1),
+#      title='Sine Wave', legend=True, figsize=(10, 5), color='green')
 
-    return parsed_params
+# plot(y),
+#      marker_points=np.array([10, 20, 30]), marker_points_style='ro',
+#      marker_style='x', line_style='--', x_label='X-axis',
+#      y_label='Y-axis', xlim=(0, 100), ylim=(-1, 1),
+#      title='Sine Wave', legend=True, figsize=(10, 5), color='green')
+
+# plot(y_data=y,marker_points=np.array([10, 20, 30]), marker_points_style='ro',
+#      marker_style='x', line_style='--', x_label='X-axis',
+#      y_label='Y-axis', xlim=(0, 100), ylim=(-1, 1),
+#      title='Sine Wave', legend=True, figsize=(10, 5), color='green')
+
+
 
 def plot(*args, **params):
     # Define default and optional values for each parameter in default_params
@@ -65,6 +63,9 @@ def plot(*args, **params):
         print(e)  # Print the exception message with calling stack path
         return None
 
+
+
+
     # Determine x_data and y_data from args or params
     if len(args) == 2:
         x_data, y_data = args
@@ -79,9 +80,12 @@ def plot(*args, **params):
     if x_data is None:
         x_data = np.arange(len(y_data))
     else:
+        
+        time_data = pd.api.types.is_datetime64_any_dtype(x_data)
         x_data = np.asarray(x_data)
         if len(x_data) != len(y_data):
             raise ValueError("Length of x_data must be equal to length of y_data.")
+    
     
     # Ensure y_data is a NumPy array
     y_data = np.asarray(y_data)
@@ -92,9 +96,17 @@ def plot(*args, **params):
     else:
         ax = params['ax']
     
+
+
+    
     # Plot the values
     line = ax.plot(x_data, y_data, params['line_style'], label='Data', marker=params['marker_style'], color=params['color'])
     
+    
+    if time_data:
+        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
+        plt.xticks(rotation=45, ha='right', fontsize=8)
+
     # Highlight marker_points if provided
     if params['marker_points'] is not None:
         ax.plot(x_data[params['marker_points']], y_data[params['marker_points']], params['marker_points_style'], linestyle='None', label='marker_points')
@@ -121,27 +133,6 @@ def plot(*args, **params):
 
     return line
 
-# # Example usage:
-# y = np.sin(np.linspace(0, 10, 100))
-# plot(np.arange(100), y),
-#      marker_points=np.array([10, 20, 30]), marker_points_style='ro',
-#      marker_style='x', line_style='--', x_label='X-axis',
-#      y_label='Y-axis', xlim=(0, 100), ylim=(-1, 1),
-#      title='Sine Wave', legend=True, figsize=(10, 5), color='green')
-
-# plot(y),
-#      marker_points=np.array([10, 20, 30]), marker_points_style='ro',
-#      marker_style='x', line_style='--', x_label='X-axis',
-#      y_label='Y-axis', xlim=(0, 100), ylim=(-1, 1),
-#      title='Sine Wave', legend=True, figsize=(10, 5), color='green')
-
-# plot(y_data=y,marker_points=np.array([10, 20, 30]), marker_points_style='ro',
-#      marker_style='x', line_style='--', x_label='X-axis',
-#      y_label='Y-axis', xlim=(0, 100), ylim=(-1, 1),
-#      title='Sine Wave', legend=True, figsize=(10, 5), color='green')
-
-
-
 def plot_df_columns(df, **params):
     # Define default and optional values for each parameter in default_params
     default_params = {
@@ -161,6 +152,7 @@ def plot_df_columns(df, **params):
         'legend_loc': {'default': 'upper right', 'optional': {'best', 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'}},
         'figsize': {'default': None},
         'color': {'default': None},
+        'time_column':'time',
         'ax': {'default': None}
     }
 
@@ -171,10 +163,14 @@ def plot_df_columns(df, **params):
         return None
 
     # Determine x_data based on x_data_type
-    if params['x_data_type'] == 'index':
+    if (params['x_data_type']=='index'):
         x_data = range(df.shape[0])
-    elif params['x_data_type'] == 'time':
-        x_data = df.index
+        x_label = 'index'
+    elif (params['x_data_type']=='time'):
+        parse_parameter(params['time_column'],df.columns)
+        x_data = df[params['time_column']]
+        x_data = pd.to_datetime(x_data, utc=True)
+        x_label = 'time'
 
     # Create a figure and axis if ax is not provided
     if params['ax'] is None:
@@ -214,7 +210,7 @@ def plot_df_columns(df, **params):
         handles.append(handle)
     
     # Set labels and title
-    ax.set_xlabel(params['x_label'])
+    ax.set_xlabel(x_label)
     ax.set_ylabel(params['y_label'])
     ax.set_title(params['title'])
     
@@ -226,22 +222,26 @@ def plot_df_columns(df, **params):
     
     # Add a legend if required
     if params['legend']:
-        ax.legend( params['columns'], loc=params['legend_loc'])
+        ax.legend(params['columns'], loc=params['legend_loc'])
     
     # Show the plot if a new figure was created
     if params['ax'] is None:
         plt.show()
 
-# Example usage
-# Assuming `ship_data` is your DataFrame
+
+
 # plot_df_columns(ship_data, columns=['latitude', 'longitude'],
 #  line_styles=['--', '-.'],
-#   x_label='Time', y_label='Values', legend=True, figsize=(10, 5),
+#   y_label='Values', legend=True, figsize=(10, 5),
 #   color=['red', 'blue',],marker_points=[10, 20, 30],
 #   marker_points_style='o',title='Ship Data',
-#   xlim=(0, 100), ylim=(0, 100), legend_loc='upper right')
+#   ylim=(0, 100), legend_loc='upper right',x_data_type='time')
 
-
+def create_color_vector(num_colors):
+    colors = ['blue', 'green', 'red', 'cyan', 'magenta', 'yellow', 'black']
+    color_cycle = cycle(colors)
+    color_vector = [next(color_cycle) for _ in range(num_colors)]
+    return color_vector
 
 
 def create_subplot_scheme(axes_size=(5, 2), num_axes=1, max_axes_in_row=4):

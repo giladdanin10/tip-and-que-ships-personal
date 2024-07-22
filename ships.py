@@ -25,12 +25,11 @@ class SHIPS:
     vehicle_count = 0
 
     # Initializer / Instance attributes
-    def __init__(self):
+    def __init__(self,save_folder = './pkl'):
         self.data_dic = []  # It should be self.kuku to be an instance attribute
         self.info_df = []
-        self.prob_MMSI = []
-        self.prob_dic = {}
         self.lines_removed = []
+        self.save_folder = save_folder
 
     def load_raw_data(self, input_csv_file_name_full, reload_level=0,save_folder = './pkl'):
         print ('load_row_data')
@@ -57,7 +56,7 @@ class SHIPS:
     
 
     def prepare_df(self,df,reload_level=0,save_folder = './pkl',df_filter_dic={},columns_list_keep=None):
-        print ('filter_df')
+        print ('prepare_df')
         print ('----------------')
 
 
@@ -65,11 +64,8 @@ class SHIPS:
         df = None
         df_filt_file_name = save_folder + '/df_filt.pkl'
 
-# filtered df
-        if (reload_level>2) and self.check_pkl_files_exists(save_folder):
-            return status
-        
-        elif (reload_level>=2) and os.path.exists(df_filt_file_name):
+# filtered df        
+        if (reload_level>=2) and os.path.exists(df_filt_file_name):
             df,status = load_df_from_file(df_filt_file_name)
             return df
         else:
@@ -104,6 +100,8 @@ class SHIPS:
             if (columns_list_keep != None):
                 df = df[columns_list_keep]
 
+            df = reorder_df_columns(df,['time','time_seconds','name','imo','mmsi','latitude','longitude','position_timestamp','static_timestamp'])
+
 
     # add the original index
             df['org_index'] = df.index
@@ -123,11 +121,11 @@ class SHIPS:
 
 
     def check_pkl_files_exists(self,save_folder = './pkl'):
-        data_dic_file_name = save_folder+'/data_dic.pkl'
+        # data_dic_file_name = save_folder+'/data_dic.pkl'
         info_df_file_name = save_folder+'/info_df.pkl'
-        prob_dic_file_name = save_folder+'/prob_dic.pkl'
+        # prob_dic_file_name = save_folder+'/prob_dic.pkl'
         
-        if ( (os.path.exists(data_dic_file_name)) and (os.path.exists(data_dic_file_name)) and (os.path.exists(data_dic_file_name)) ):
+        if ( (os.path.exists(info_df_file_name)) ):
             return True
         else:
             return False
@@ -138,12 +136,12 @@ class SHIPS:
     def get_ship_df(self,data_structure,item,**params):
         default_params = {
             'item_type': {'default': 'name', 'optional': {'name','mmsi'}},
-            'sort_columns':{'default':None}
+            'sort_columns':{'default':None},
+            'handle_common_time_rows': {'default': True},
+            'modify_data_structure': {'default': True},
         }
 
         params = parse_func_params(params, default_params)
-
-
 
         if (isinstance(data_structure,dict)):
             df_filt = data_structure[item]
@@ -157,6 +155,18 @@ class SHIPS:
             parse_parameter(params['sort_columns'],data_structure.columns)        
 
             df_filt = df_filt.sort_values(by=params['sort_columns'])
+
+
+        if (params['handle_common_time_rows']):
+            df_filt = handle_common_time_rows_in_df(df_filt,ID_columns=params['item_type'],time_column='static_timestamp')
+
+
+
+        # if (params['modify_data_structure']):
+        #     if (isinstance(data_structure,dict)):
+        #         data_structure[item] = df_filt
+        #     else:
+        #         data_structure = df_filt
 
         return df_filt
 
@@ -210,7 +220,9 @@ class SHIPS:
         default_params = {
             'item_type': {'default': 'name', 'optional': {'name','mmsi'}},
             'num_lines': {'default': None},
-            'id_column_check': {'default': []}
+            'id_column_check': {'default': []},
+            'reload_level':0,
+            'save_folder':self.save_folder
         }
 
         try:
@@ -218,6 +230,12 @@ class SHIPS:
         except ValueError as e:
             print(e)  # Print the exception message with calling stack path
             return None
+
+
+        if (params['reload_level']>=3) and self.check_pkl_files_exists(params['save_folder']):   
+            self.info_df,status = load_var(params['save_folder'] + '/info_df.pkl')
+            return self.info_df
+        
 
         print ('create item_dic')
         groups = df.groupby(params['item_type'])
@@ -262,7 +280,9 @@ class SHIPS:
             info_df = pd.concat([info_df, ships_df_line])
 
         info_df = info_df.sort_values(by='len', ascending=False)
+        save_var(info_df,self.save_folder + '/info_df.pkl')
 
+        self.info_df = info_df
         # info_df = info_df.reset_index(drop=True)
         return info_df
 
@@ -290,7 +310,7 @@ class SHIPS:
             'time_column':'time',
             'axes_size':(3, 2),
             'sort_columms': None,
-            'pre_process': None,
+            'pre_process': {'default': None, 'optional': {None,'remove_bias'}},
         }
         try:
             params = parse_func_params(params, default_params)
@@ -298,6 +318,8 @@ class SHIPS:
             print(e)  # Print the exception message with calling stack path
             return None
 
+
+        parse_parameter(params['columns'],df.columns)
 
         if params['columns'] is None:
             raise ValueError("columns is empty")
@@ -360,9 +382,9 @@ class SHIPS:
 
 
 
-    # def create_data_dic(self,df,vessel_names = None,vessel_data_length_thresh=5,save_folder = './pkl',reload_level=0):
-    #     print ('create_data_dic')
-    #     print ('----------------')
+    def create_data_dic(self,df,vessel_names = None,vessel_data_length_thresh=5,save_folder = './pkl',reload_level=0):
+        print ('create_data_dic')
+        print ('----------------')
 
     #     data_dic_file_name = save_folder+'/data_dic.pkl'
     #     info_df_file_name = save_folder+'/info_df.pkl'
@@ -393,8 +415,8 @@ class SHIPS:
     #         self.prob_dic['name']['short'] = []
 
     # # group by Vessel_Name
-    #         grouped = df.groupby('name')
-    #         self.data_dic = {Vessel_Name: group for Vessel_Name, group in grouped}    
+        grouped = df.groupby('name')
+        self.data_dic = {Vessel_Name: group for Vessel_Name, group in grouped}    
 
 
     #         good_list = []

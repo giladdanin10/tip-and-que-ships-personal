@@ -4,6 +4,11 @@ import pandas as pd
 from convert_aux import * 
 import convert_aux as CONVERT
 from time_aux import *
+import os
+
+
+
+
 def filter_df(df, filter_dic):
     """
     Filters a DataFrame based on a dictionary of column filters.
@@ -89,6 +94,12 @@ def repeat_single_value_in_column (df,value,column_name,to_print=False):
     return df
 
 
+def get_time_related_df_columns(df):
+    time_columns = [col for col in df.columns if pd.api.types.is_datetime64_any_dtype(df[col])]
+    return time_columns
+
+
+
 def export_df(df, out_file_name, columns=None, start_line=0, num_lines=None):
     """
     Exports a subset of a DataFrame to an Excel file.
@@ -120,10 +131,41 @@ def export_df(df, out_file_name, columns=None, start_line=0, num_lines=None):
     print(f'exporting {num_lines} lines from df to {out_file_name}')
 
     if (file_extension=='.xlsx'):
+        time_columns = get_time_related_df_columns(subset_df)
+
+        for column in time_columns:
+            subset_df.loc[:, column] = subset_df[column].dt.tz_localize(None)
+
+
         subset_df.to_excel(out_file_name, index=False)
         
     elif (file_extension=='.csv'):
         subset_df.to_csv(out_file_name, index=False)
+
+def reorder_df_columns(df, order):
+    """
+    Reorder the columns of a DataFrame.
+
+    Parameters:
+    df (pd.DataFrame): The DataFrame whose columns are to be reordered.
+    order (list): A list specifying the desired order of columns. Columns not specified in the list will be appended at the end.
+
+    Returns:
+    pd.DataFrame: A DataFrame with columns reordered as specified.
+    """
+    # Ensure the columns in 'order' exist in the DataFrame
+    order = [col for col in order if col in df.columns]
+
+    # Get the remaining columns that are not in the 'order' list
+    remaining_cols = [col for col in df.columns if col not in order]
+
+    # Concatenate the specified columns with the remaining columns
+    new_order = order + remaining_cols
+
+    # Reorder the DataFrame columns
+    return df[new_order]
+
+
 
 
 def handle_common_time_rows_in_df(df, time_column='time', ID_columns=[]):
@@ -176,7 +218,9 @@ def handle_common_time_rows_in_df(df, time_column='time', ID_columns=[]):
         # Drop the rows that have been combined
         if (len(indices_to_drop)!=0):
             df.drop(indices_to_drop, inplace=True)
-        
+            # df.loc[indices_to_drop, :] = df.drop(indices_to_drop)
+
+            
         # Print progress every 1000 chunks
         if chunk_number % 10 == 0:
             print(f"Processed chunk {chunk_number} out of {total_chunks}")

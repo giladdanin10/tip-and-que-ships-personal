@@ -47,7 +47,7 @@ def parse_func_params(params, default_params):
 
         # Validate parameter value against allowed_values if provided
         if allowed_values and param_value not in allowed_values:
-            raise ValueError(f"{calling_func_name}: Invalid value '{param_value}' for parameter '{param_name}'. Allowed values are {sorted(allowed_values)}.")
+            raise ValueError(f"{calling_func_name}: Invalid value '{param_value}' for parameter '{param_name}'. Allowed values are {(allowed_values)}.")
 
         parsed_params[param_name] = param_value
 

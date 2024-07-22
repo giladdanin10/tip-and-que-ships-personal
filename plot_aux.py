@@ -79,6 +79,7 @@ def plot(*args, **params):
     # Use index for x_data if not provided
     if x_data is None:
         x_data = np.arange(len(y_data))
+        time_data  = False
     else:
         
         time_data = pd.api.types.is_datetime64_any_dtype(x_data)

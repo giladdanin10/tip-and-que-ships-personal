@@ -223,7 +223,7 @@ class SHIPS:
             'item_type': {'default': 'name', 'optional': {'name','mmsi'}},
             'num_lines': {'default': None},
             'id_column_check': {'default': []},
-            'reload_level':0,
+            'reset':False,
             'save_folder':self.save_folder
         }
 
@@ -234,9 +234,14 @@ class SHIPS:
             return None
 
 
-        if (params['reload_level']>=3) and self.check_pkl_files_exists(params['save_folder']):   
+        if (params['reset']):  
+            self.info_df = pd.DataFrame(index=self.data_dic.keys())
+            self.info_df['processed'] = False
+
+
+        elif(os.path.exists(params['save_folder'] + '/info_df.pkl')):
             self.info_df,status = load_var(params['save_folder'] + '/info_df.pkl')
-            return self.info_df
+    
         
 
         
@@ -252,6 +257,8 @@ class SHIPS:
         if (params['num_lines'] != None):
             item_list = item_list[:params['num_lines']]
 
+        # filter out those already processed
+        item_list = [item for item in item_list if not self.info_df.loc[item,'processed']]
 
         for i, item in enumerate(item_list):
             if (i % 1000 == 0):
@@ -278,11 +285,19 @@ class SHIPS:
 
             info_df = pd.concat([info_df, ships_df_line])
 
+# save internediate results
+            if ((i % 1000 == 0) and (i>0)):
+                self.info_df = merge_dataframes_on_index(self.info_df, info_df,how='left',mode='replace')
+                self.info_df.sort_values(by='processed',inplace=True,ascending=False)
 
-        self.info_df = merge_dataframes_on_index(self.info_df, info_df,how='left',mode='replace')
-        self.info_df.sort_values(by='processed',inplace=True,ascending=False)
+                save_var(self.info_df,self.save_folder + '/info_df.pkl')
 
-        save_var(self.info_df,self.save_folder + '/info_df.pkl')
+# save final results
+            self.info_df = merge_dataframes_on_index(self.info_df, info_df,how='left',mode='replace')
+            self.info_df.sort_values(by='processed',inplace=True,ascending=False)
+
+            save_var(self.info_df,self.save_folder + '/info_df.pkl')
+
 
         # info_df = info_df.reset_index(drop=True)
         return self.info_df

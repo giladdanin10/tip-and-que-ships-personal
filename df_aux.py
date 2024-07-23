@@ -259,7 +259,7 @@ def handle_common_time_rows_in_df(df, time_column='time', ID_columns=[]):
     for chunk_number, (_, chunk) in enumerate(df.groupby(ID_columns, group_keys=False), start=1):
         combine_rows(chunk, chunk_number)
 
-    print(f"Number of common time chunks found: {common_time_chunks_count}")
+    # print(f"Number of common time chunks found: {common_time_chunks_count}")
     
     return df
 

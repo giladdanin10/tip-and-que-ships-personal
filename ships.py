@@ -30,6 +30,7 @@ class SHIPS:
         self.info_df = []
         self.lines_removed = []
         self.save_folder = save_folder
+        
 
     def load_raw_data(self, input_csv_file_name_full, reload_level=0,save_folder = './pkl'):
         print ('load_row_data')
@@ -133,42 +134,36 @@ class SHIPS:
 
 
 # data_structure can be either a df or a dictionary of dfs
-    def get_ship_df(self,data_structure,item,**params):
+    def get_ship_df(self,ship_name,**params):
         default_params = {
             'item_type': {'default': 'name', 'optional': {'name','mmsi'}},
             'sort_columns':{'default':None},
             'handle_common_time_rows': {'default': True},
-            'modify_data_structure': {'default': True},
+            'modify_data_dic': {'default': True},
         }
 
         params = parse_func_params(params, default_params)
 
-        if (isinstance(data_structure,dict)):
-            df_filt = data_structure[item]
-        else:
-            df_filt = data_structure.loc[data_structure[params['item_type']]==item]
+        
+        ship_df = self.data_dic[ship_name]
+        
+        if (not self.info_df.loc[ship_name,'processed']):
+            if (params['sort_columns'] is not None):
+                parse_parameter(params['sort_columns'],ship_df.columns)        
+
+                ship_df = ship_df.sort_values(by=params['sort_columns'])
 
 
-        # df_filt = handle_common_time_rows_in_df(df_filt,ID_columns=item_type)
-
-        if (params['sort_columns'] is not None):
-            parse_parameter(params['sort_columns'],data_structure.columns)        
-
-            df_filt = df_filt.sort_values(by=params['sort_columns'])
-
-
-        if (params['handle_common_time_rows']):
-            df_filt = handle_common_time_rows_in_df(df_filt,ID_columns=params['item_type'],time_column='static_timestamp')
+            if (params['handle_common_time_rows']):
+                ship_df = handle_common_time_rows_in_df(ship_df,ID_columns=params['item_type'],time_column='static_timestamp')
 
 
 
-        # if (params['modify_data_structure']):
-        #     if (isinstance(data_structure,dict)):
-        #         data_structure[item] = df_filt
-        #     else:
-        #         data_structure = df_filt
+            if (params['modify_data_dic']):          
+                self.data_dic[ship_name] = ship_df
+                self.info_df.loc[ship_name,'processed'] = True
 
-        return df_filt
+        return ship_df
 
 
 
@@ -185,29 +180,36 @@ class SHIPS:
             print(e)  # Print the exception message with calling stack path
             return None
 
-
+        
         if (not isinstance(params['id_column_check'],list)):
             params['id_column_check'] = [params['id_column_check']]
 
-        stats_dic = {
+        if (ship_data.shape[0]==1):
+            stats_dic = {
             params['item_type']:ship_data[params['item_type']].unique().tolist(),
             'len': [ship_data.shape[0]],  # Scalar value wrapped in a list
-            'min_time':min(ship_data['time']),
-            'max_time':max(ship_data['time']),
-            'total_time':max(ship_data['time'])- min(ship_data['time']),
-            'min_time_diff[mins]': round(np.min(time_diff_convert(ship_data['time'].diff()))),
-            'max_time_diff[mins]': round(np.max(time_diff_convert(ship_data['time'].diff()))),
-            'mean_time_diff[mins]': round(np.mean(time_diff_convert(ship_data['time'].diff()))),
-            'min_longitude':(min(ship_data['longitude'])),
-            'max_longitude':(max(ship_data['longitude'])),
-            'min_latitude':(min(ship_data['latitude'])),
-            'max_latitude':(max(ship_data['latitude'])),
-        }
-        stats_dic['span_longitude']  = stats_dic['max_longitude']-stats_dic['min_longitude']
-        stats_dic['span_latitude']  = stats_dic['max_latitude']-stats_dic['min_latitude']
+            }
+        else:
 
-        for column in params['id_column_check']:
-            stats_dic[f'num_{column}s'] = ship_data[column].unique().shape[0]
+            stats_dic = {
+                params['item_type']:ship_data[params['item_type']].unique().tolist(),
+                'len': [ship_data.shape[0]],  # Scalar value wrapped in a list
+                'min_time':min(ship_data['time']),
+                'max_time':max(ship_data['time']),
+                'total_time':max(ship_data['time'])- min(ship_data['time']),
+                'min_time_diff[mins]': round(np.min(time_diff_convert(ship_data['time'].diff()))),
+                'max_time_diff[mins]': round(np.max(time_diff_convert(ship_data['time'].diff()))),
+                'mean_time_diff[mins]': round(np.mean(time_diff_convert(ship_data['time'].diff()))),
+                'min_longitude':(min(ship_data['longitude'])),
+                'max_longitude':(max(ship_data['longitude'])),
+                'min_latitude':(min(ship_data['latitude'])),
+                'max_latitude':(max(ship_data['latitude'])),
+            }
+            stats_dic['span_longitude']  = stats_dic['max_longitude']-stats_dic['min_longitude']
+            stats_dic['span_latitude']  = stats_dic['max_latitude']-stats_dic['min_latitude']
+
+            for column in params['id_column_check']:
+                stats_dic[f'num_{column}s'] = ship_data[column].unique().shape[0]
 
 
 
@@ -216,7 +218,7 @@ class SHIPS:
 
 
     # def create_info_df(df,num_lines = None,item_type='mmsi',id_column_check='name'):
-    def create_info_df(self,df,**params):
+    def create_info_df(self,**params):
         default_params = {
             'item_type': {'default': 'name', 'optional': {'name','mmsi'}},
             'num_lines': {'default': None},
@@ -237,32 +239,29 @@ class SHIPS:
             return self.info_df
         
 
-        print ('create item_dic')
-        groups = df.groupby(params['item_type'])
-        item_dict = {name: group for name, group in groups}
+        
 
         print('create info_df')
+        print('----------------')
 
         info_df = pd.DataFrame()
-        prob_mmsi = []
-        item_list = df[params['item_type']].unique()
+        
+        item_list = list(self.data_dic.keys())
+
 
         if (params['num_lines'] != None):
             item_list = item_list[:params['num_lines']]
 
 
         for i, item in enumerate(item_list):
-            
             if (i % 1000 == 0):
                 print(f"processing {params['item_type']} {i} out of {len(item_list)}")
             # ship_data = get_item_df(item_dict,item,item_type=item_type)  # Assuming get_ship_data is defined elsewhere
-            ship_data = self.get_ship_df(item_dict,item,**params)  # Assuming get_ship_data is defined elsewhere
+            ship_data = self.get_ship_df(item,**params)  # Assuming get_ship_data is defined elsewhere
 
 
             item = ship_data[params['item_type']].iloc[0]
 
-            if (ship_data.shape[0]==1):
-                continue
             
             try:
                 # ships_df_line = pd.DataFrame(get_ship_data_stats(ship_data,item_type=item_type,id_column_check=id_column_check),index=[item])
@@ -279,14 +278,16 @@ class SHIPS:
 
             info_df = pd.concat([info_df, ships_df_line])
 
-        info_df = info_df.sort_values(by='len', ascending=False)
-        save_var(info_df,self.save_folder + '/info_df.pkl')
 
-        self.info_df = info_df
+        self.info_df = merge_dataframes_on_index(self.info_df, info_df,how='left',mode='replace')
+        self.info_df.sort_values(by='processed',inplace=True,ascending=False)
+
+        save_var(self.info_df,self.save_folder + '/info_df.pkl')
+
         # info_df = info_df.reset_index(drop=True)
-        return info_df
+        return self.info_df
 
-
+    
 
 
     def plot_ship_data(self,df,ship_names,**params):
@@ -335,17 +336,17 @@ class SHIPS:
                 break
 
             # Assuming 'ships.get_item_df' is a function to filter the DataFrame by item
-            df_filt = self.get_ship_df (df, ship_names[i],**params)
+            ship_df = self.get_ship_df (ship_names[i],**params)
 
             plot_params = params
             plot_params['ax'] = ax
             plot_params['title'] = ship_names[i]
             if (params['pre_process']=='remove_bias'):
                 for column in params['columns']:
-                    df_filt.loc[:, column] = df_filt[column] - df_filt[column].mean()
+                    ship_df.loc[:, column] = ship_df[column] - ship_df[column].mean()
 
 
-            plot_df_columns(df_filt,**plot_params)
+            plot_df_columns(ship_df,**plot_params)
         
 # usage
 # plot_ship_data(df,info_df.index[range(4)].tolist(),columns=['latitude', 'longitude'],ylim = [-90,90],pre_process='remove_bias')
@@ -418,6 +419,10 @@ class SHIPS:
         grouped = df.groupby('name')
         self.data_dic = {Vessel_Name: group for Vessel_Name, group in grouped}    
 
+        self.info_df = pd.DataFrame(index=self.data_dic.keys())
+        self.info_df['processed'] = False
+
+        
 
     #         good_list = []
     # # make complete missing data at lines containing nans at certain colums

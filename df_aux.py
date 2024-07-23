@@ -7,6 +7,36 @@ from time_aux import *
 import os
 
 
+def merge_dataframes_on_index(df1, df2, how='left', mode='merge'):
+    # Ensure that indices are aligned for merging
+    df1 = df1.copy()
+    df2 = df2.copy()
+
+    # Merge DataFrames
+    merged_df = df1.merge(df2, left_index=True, right_index=True, how=how, suffixes=('', '_dup'))
+
+    if mode == 'merge':
+        # Remove duplicate columns by merging the data
+        cols = merged_df.columns
+        for col in cols:
+            if '_dup' in col:
+                original_col = col.replace('_dup', '')
+                if original_col in merged_df.columns:
+                    # Handle duplication by backfilling with data from the duplicate column
+                    merged_df[original_col] = merged_df[[original_col, col]].bfill(axis=1).iloc[:, 0]
+                    merged_df.drop(columns=[col], inplace=True)
+    elif mode == 'replace':
+        # Replace data in mutual columns with data from df2
+        cols = merged_df.columns
+        for col in cols:
+            if '_dup' in col:
+                original_col = col.replace('_dup', '')
+                if original_col in merged_df.columns:
+                    # Replace data in original column with data from the duplicate column
+                    merged_df[original_col] = merged_df[col]
+                    merged_df.drop(columns=[col], inplace=True)
+
+    return merged_df
 
 
 def filter_df(df, filter_dic):

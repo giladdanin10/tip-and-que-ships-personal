@@ -140,6 +140,7 @@ class SHIPS:
             'sort_columns':{'default':None},
             'handle_common_time_rows': {'default': True},
             'modify_data_dic': {'default': True},
+            'reprocess':False
         }
 
         params = parse_func_params(params, default_params)
@@ -147,7 +148,7 @@ class SHIPS:
         
         ship_df = self.data_dic[ship_name]
         
-        if (not self.info_df.loc[ship_name,'processed']):
+        if (not self.info_df.loc[ship_name,'processed']) or (params['reprocess']):
             if (params['sort_columns'] is not None):
                 parse_parameter(params['sort_columns'],ship_df.columns)        
 
@@ -157,7 +158,11 @@ class SHIPS:
             if (params['handle_common_time_rows']):
                 ship_df = handle_common_time_rows_in_df(ship_df,ID_columns=params['item_type'],time_column='static_timestamp')
 
+# remnove lines with Nan in Latitude
+            ship_df = ship_df.loc[ship_df['latitude'].notna()]
 
+# remove bias from 
+            # ship_df['time_seconds_no_bias'] = ship_df['time_seconds']-ship_df['time_seconds'].min()
 
             if (params['modify_data_dic']):          
                 self.data_dic[ship_name] = ship_df
@@ -171,7 +176,7 @@ class SHIPS:
     def get_ship_data_stats(self,ship_data,**params):
         default_params = {
             'item_type': {'default': 'name', 'optional': {'name','mmsi'}},
-        'id_column_check': {'default': []}
+            'id_column_check': {'default': []}
     }
 
         try:
@@ -222,7 +227,7 @@ class SHIPS:
         default_params = {
             'item_type': {'default': 'name', 'optional': {'name','mmsi'}},
             'num_lines': {'default': None},
-            'id_column_check': {'default': []},
+            'id_column_check': {'default': 'mmsi'},
             'reset':False,
             'save_folder':self.save_folder
         }
@@ -264,7 +269,9 @@ class SHIPS:
             if (i % 1000 == 0):
                 print(f"processing {params['item_type']} {i} out of {len(item_list)}")
             # ship_data = get_item_df(item_dict,item,item_type=item_type)  # Assuming get_ship_data is defined elsewhere
-            ship_data = self.get_ship_df(item,**params)  # Assuming get_ship_data is defined elsewhere
+            get_ship_df_params = params
+            get_ship_df_params['strict_params'] = False 
+            ship_data = self.get_ship_df(item,**get_ship_df_params)  # Assuming get_ship_data is defined elsewhere
 
 
             item = ship_data[params['item_type']].iloc[0]
@@ -272,7 +279,9 @@ class SHIPS:
             
             try:
                 # ships_df_line = pd.DataFrame(get_ship_data_stats(ship_data,item_type=item_type,id_column_check=id_column_check),index=[item])
-                ships_df_line = pd.DataFrame(self.get_ship_data_stats(ship_data,**params),index=[item])
+                get_ship_df_params = params
+                get_ship_df_params['strict_params'] = False 
+                ships_df_line = pd.DataFrame(self.get_ship_data_stats(ship_data,**get_ship_df_params),index=[item])
 
             except Exception as e:
                 # Print the exception message
@@ -293,21 +302,25 @@ class SHIPS:
                 save_var(self.info_df,self.save_folder + '/info_df.pkl')
 
 # save final results
-            self.info_df = merge_dataframes_on_index(self.info_df, info_df,how='left',mode='replace')
-            self.info_df.sort_values(by='processed',inplace=True,ascending=False)
+        self.info_df = merge_dataframes_on_index(self.info_df, info_df,how='left',mode='replace')
+        self.info_df.sort_values(by='processed',inplace=True,ascending=False)
 
-            save_var(self.info_df,self.save_folder + '/info_df.pkl')
+        save_var(self.info_df,self.save_folder + '/info_df.pkl')
 
 
         # info_df = info_df.reset_index(drop=True)
         return self.info_df
 
+    def get_ship_stats(self,ship_name):
+        ship_data = self.get_ship_df(ship_name)
+        return self.get_ship_data_stats(ship_data)  
     
 
 
-    def plot_ship_data(self,df,ship_names,**params):
+
+    def plot_ship_data(self,ship_names,**params):
         default_params = {
-            'columns': {'default': ['latitude','longitude']},
+            'columns': {'default': ['latitude','longitude','time_seconds']},
             'x_data_type': {'default': 'index', 'optional': {'index', 'time'}},
             'marker_points': {'default': None},
             'marker_points_style': {'default': 'o', 'optional': {'o', 'x', 's', 'd', 'ro'}},
@@ -324,9 +337,10 @@ class SHIPS:
             'figsize': {'default': None},
             'color': {'default': None},
             'time_column':'time',
-            'axes_size':(3, 2),
+            'axes_size_base':(3, 2),
             'sort_columms': None,
-            'pre_process': {'default': None, 'optional': {None,'remove_bias'}},
+            'pre_process_params': {'default':{}},
+            'max_plot_ships': {'default': 16},
         }
         try:
             params = parse_func_params(params, default_params)
@@ -334,34 +348,66 @@ class SHIPS:
             print(e)  # Print the exception message with calling stack path
             return None
 
-
-        parse_parameter(params['columns'],df.columns)
-
-        if params['columns'] is None:
-            raise ValueError("columns is empty")
+        if (params['x_data_type'] == 'time'):
+            temp = (params['axes_size'][0]*1.1,params['axes_size'][1]*1.3)
+            params['axes_size'] = temp
         
-        elif not isinstance(ship_names,list):
+
+        if isinstance(ship_names,pd.Index):
+            ship_names = ship_names.tolist()
+        elif isinstance(ship_names,str):
             ship_names = [ship_names]
 
-        fig, axes = create_subplot_scheme(axes_size=params['axes_size'], num_axes=len(ship_names))
+        if (params['max_plot_ships'] is not None):
+            num_plot_ships = min(len(ship_names),params['max_plot_ships'])
+        else:
+            num_plot_ships = len(ship_names)
 
+        if ('time' in params['columns']):
+            print ('use time_seconds instead of time')
+            return
+
+
+        num_cols = min(4, num_plot_ships)
+        num_rows = (num_plot_ships + num_cols - 1) // num_cols  # Ceiling division to ensure all axes fit
+
+        params['axes_size'] = (params['axes_size_base'][0]*4/num_cols,params['axes_size_base'][1]*4/num_cols)
+
+
+        fig, axes,num_rows,num_cols = create_subplot_scheme(axes_size=params['axes_size'], num_axes=num_plot_ships)
+
+
+        # if (params['ylim'] is None):
+        #     info_df_summry = self.get_info_df_summary()
+        #     params['ylim'] = [info_df_summry['max_span_longitude']
 
         for i, ax in enumerate(axes):
             if i > len(ship_names):
                 break
 
-            # Assuming 'ships.get_item_df' is a function to filter the DataFrame by item
-            ship_df = self.get_ship_df (ship_names[i],**params)
+            get_ship_df_params = params
+            get_ship_df_params['strict_params'] = False
+            ship_df = self.get_ship_df (ship_names[i],**get_ship_df_params)
+
+
+        
+            columns_reg = [string for string in params['columns'] if string != 'time_seconds']
+
+            min_values = ship_df.loc[:,columns_reg].min()
+            max_values = ship_df.loc[:,columns_reg].max()
+
+            time_span_params = {
+                    'span':{'val':[min(min_values),max(max_values)],'columns':['time_seconds']},
+            }
+            
+            params['pre_process_params'].update(time_span_params)
+
 
             plot_params = params
+            plot_params['strict_params'] = False
             plot_params['ax'] = ax
             plot_params['title'] = ship_names[i]
-            if (params['pre_process']=='remove_bias'):
-                for column in params['columns']:
-                    ship_df.loc[:, column] = ship_df[column] - ship_df[column].mean()
-
-
-            plot_df_columns(ship_df,**plot_params)
+            ax = plot_df_columns(ship_df,**plot_params)
         
 # usage
 # plot_ship_data(df,info_df.index[range(4)].tolist(),columns=['latitude', 'longitude'],ylim = [-90,90],pre_process='remove_bias')
@@ -698,16 +744,6 @@ class SHIPS:
 
 
 
-    def get_info_df_summary(self):
-        info_df_summary = {}
-
-        for column in (vessels_info_df.columns):
-            info_df_summary[column] = (self.info_df[column].min(),self.info_df[column].max())
-
-        print_dict(info_df_summary)
-
-        return 
-
 
 
 
@@ -809,3 +845,28 @@ class SHIPS:
                 print(f'could not export MMSI={inf_df.index[i]} to jason')
         print(f'saved {i} files in {file_path}')
         return   
+
+
+    def get_info_df_summary(self,info_df=None):
+        if (info_df is None):
+            info_df = self.info_df
+
+        info_df_stats = {
+            'num_total':info_df.shape[0],
+            'num_processed': len(info_df['processed']),
+            'min_len': info_df.len.min(),
+            'max_len': info_df.len.max(),
+            'min_time': info_df.min_time.min(),
+            'max_time': info_df.max_time.max(),
+            'max_total_time': info_df.total_time.max(),
+            'min_latitude': info_df.min_latitude.min(),
+            'max_latitude': info_df.max_latitude.max(),
+            'min_longitude': info_df.min_longitude.min(),
+            'max_longitude': info_df.max_longitude.max(), 
+            'max_span_longitude': info_df.span_longitude.max(), 
+            'max_span_latitude': info_df.span_latitude.max(), 
+            'min_span_longitude': info_df.span_longitude.min(), 
+            'min_span_latitude': info_df.span_latitude.min(), 
+            'num_rows_nan_ship_name': info_df.loc[info_df.name==''].len,
+            }
+        return info_df_stats

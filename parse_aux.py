@@ -23,14 +23,21 @@ def parse_parameter(parameter, allowed_values):
             raise ValueError(f"Invalid value '{parameter}'. Allowed values are: {allowed_values}")
     
 
-
-
 def parse_func_params(params, default_params):
     parsed_params = {}
 
     # Get the name of the calling function
     calling_func_name = inspect.currentframe().f_back.f_code.co_name
     
+
+    strict_params = ('strict_params' not in params.keys()) or ('strict_params' in params.keys() and params['strict_params']==True)
+    
+    # Check for unexpected parameters if strict mode is enabled
+    if strict_params:
+        for param_name in params:
+            if param_name not in default_params:
+                raise ValueError(f"{calling_func_name}: Unexpected parameter '{param_name}' found.")
+
     # Validate and parse each parameter
     for param_name, param_info in default_params.items():
         if isinstance(param_info, dict):

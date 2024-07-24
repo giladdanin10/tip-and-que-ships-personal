@@ -4,6 +4,7 @@ import pandas as pd
 from convert_aux import * 
 import convert_aux as CONVERT
 from time_aux import *
+from parse_aux import *
 import os
 
 
@@ -266,48 +267,56 @@ def handle_common_time_rows_in_df(df, time_column='time', ID_columns=[]):
 
 import pandas as pd
 
-def normalize_columns(df, columns, method='min-max', add_norm_columns=True):
-    """
-    Normalize specified columns in a DataFrame.
+def pre_process_df_columns(df, **params):
 
-    Parameters:
-    df (pd.DataFrame): The DataFrame containing the columns to be normalized.
-    columns (list or str): A list of column names or a single column name to normalize.
-    method (str): The normalization method to use ('min-max' or 'z-score').
-    add_norm_columns (bool): If True, adds normalized columns with suffix '_norm'. If False, replaces the original columns.
+    def update_df(df, column, processed_col,params,method):
+        if params['add_modify'] == 'add':
+            df[column + f'_{method}'] = processed_col
+        else:
+            df[column] = processed_col
+        return df
+    
 
-    Returns:
-    pd.DataFrame: The DataFrame with normalized columns.
-    """
+    default_params = {
+            'columns': None,        
+            'pre_process_params': {'default': None},
+            'add_modify': {'default': 'modify', 'optional': ['modify', 'add']},
+        }
+
+    try:
+        params = parse_func_params(params, default_params)
+    except ValueError as e:
+        print(e)  # Print the exception message with calling stack path
+        return None
+
+
+
     # Ensure columns is a list
-    if isinstance(columns, str):
-        columns = [columns]
+    if isinstance(params['columns'], str):
+        params['columns'] = [params['columns']]
     
-    df_normalized = df.copy()
-    
-    for column in columns:
-        if method == 'min-max':
-            norm_col = (df[column] - df[column].min()) / (df[column].max() - df[column].min())
-        elif method == 'z-score':
-            norm_col = (df[column] - df[column].mean()) / df[column].std()
-        else:
-            raise ValueError("Method must be 'min-max' or 'z-score'")
-        
-        if add_norm_columns:
-            df_normalized[column + '_norm'] = norm_col
-        else:
-            df_normalized[column] = norm_col
-    
-    return df_normalized
+    df_processed = df.copy()
 
-# # Sample DataFrame
-# data = {
-#     'value1': [10, 20, 30, 40, 50],
-#     'value2': [5, 15, 25, 35, 45],
-#     'value3': [2, 4, 6, 8, 10]
-# }
-# df = pd.DataFrame(data)
+    
+    pre_process_params = params['pre_process_params']
+    
+    for method in pre_process_params.keys():
+        method_params = pre_process_params[method]
+        if 'columns' in method_params.keys():
+            columns = method_params['columns']
+        else:
+            columns = params['columns']
+        if method == 'span':
+            for column in columns:
+                processed_col = (df[column] - df[column].min()) / (df[column].max() - df[column].min()) * (method_params['val'][1] - method_params['val'][0]) + method_params['val'][0]
+        elif method == 'unbias':
+            for column in columns:
+                processed_col = (df[column] - df[column].mean())
 
-# # Normalize specified columns and add normalized columns
-# columns_to_normalize = ['value1', 'value2']
-# method = 'min-max'
+
+        df_processed = update_df(df_processed, column, processed_col,params,method)
+
+
+
+    return df_processed
+

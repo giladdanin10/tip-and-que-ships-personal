@@ -8,6 +8,7 @@ import numpy as np
 import numpy as np
 import matplotlib.pyplot as plt
 from itertools import cycle
+from df_aux import *    
 
 
 # 
@@ -105,8 +106,11 @@ def plot(*args, **params):
     
     
     if time_data:
-        plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
-        plt.xticks(rotation=45, ha='right', fontsize=8)
+        # plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
+        # plt.xticks(rotation=45, ha='right', fontsize=8)
+
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
+        ax.tick_params(axis='x', rotation=45, labelsize=8, labelright=True)
 
     # Highlight marker_points if provided
     if params['marker_points'] is not None:
@@ -154,9 +158,12 @@ def plot_df_columns(df, **params):
         'figsize': {'default': None},
         'color': {'default': None},
         'time_column':'time',
-        'ax': {'default': None}
+        'ax': {'default': None},
+        'pre_process_params': {'default':{}}
+
     }
 
+    plot_df = df.copy()
     try:
         params = parse_func_params(params, default_params)
     except ValueError as e:
@@ -172,6 +179,9 @@ def plot_df_columns(df, **params):
         x_data = df[params['time_column']]
         x_data = pd.to_datetime(x_data, utc=True)
         x_label = 'time'
+
+    if (isinstance(params['columns'], str)):
+        params['columns'] = [params['columns']]
 
     # Create a figure and axis if ax is not provided
     if params['ax'] is None:
@@ -200,13 +210,22 @@ def plot_df_columns(df, **params):
         else:
             line_styles = cycle(params['line_styles'])
     
+
+    # pre_proccess
+    for column in params['columns']: 
+        pre_process_df_columns_params = params
+        pre_process_df_columns_params['strict_params']=False  
+        plot_df = pre_process_df_columns(plot_df,**pre_process_df_columns_params)
+        
+
     # Plot each column with its own label for the legend
     handles = []
     for color, line_style, column in zip(colors, line_styles, params['columns']):
-        y_data = df[column]
+        y_data = plot_df[column]
         plot_params = {key: value for key, value in params.items() if key not in ['ax', 'columns', 'x_data_type', 'legend_loc', 'line_styles']}
         plot_params['color'] = color
         plot_params['line_style'] = line_style
+        plot_params['strict_params'] = False
         handle = plot(x_data=x_data, y_data=y_data, ax=ax, **plot_params, label=column)
         handles.append(handle)
     
@@ -228,6 +247,8 @@ def plot_df_columns(df, **params):
     # Show the plot if a new figure was created
     if params['ax'] is None:
         plt.show()
+    
+    return ax   
 
 
 
@@ -288,7 +309,7 @@ def create_subplot_scheme(axes_size=(5, 2), num_axes=1, max_axes_in_row=4):
     for i in range(num_axes, len(axes)):
         axes[i].set_visible(False)
 
-    return fig, axes[:num_axes]
+    return fig, axes[:num_axes],num_cols,num_rows
 
 
 
@@ -349,8 +370,8 @@ def plot_multiple_y_axes(df, columns=None, axes=None, x_column='index', fig_size
     ax1.tick_params(axis='y', labelcolor=color_map(0))
 
 # if it's a datetime
-    if pd.api.types.is_datetime64_any_dtype(df[x_column]):
-        plt.xticks(rotation=45, ha='right', fontsize=8)
+    # if pd.api.types.is_datetime64_any_dtype(df[x_column]):
+    #     plt.xticks(rotation=45, ha='right', fontsize=8)
 
     lines.append(ax1.lines[-1])
     labels.append(axes[0])
@@ -369,9 +390,9 @@ def plot_multiple_y_axes(df, columns=None, axes=None, x_column='index', fig_size
 
     # Rotate x-axis labels
 # if it's a datetime
-    if pd.api.types.is_datetime64_any_dtype(df[x_column]):
-        ax1.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
-        plt.xticks(rotation=45, ha='right', fontsize=8)
+    # if pd.api.types.is_datetime64_any_dtype(df[x_column]):
+    #     ax1.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
+    #     plt.xticks(rotation=45, ha='right', fontsize=8)
 
     # Use MaxNLocator to reduce the number of ticks
     # ax1.xaxis.set_major_locator(MaxNLocator(nbins=5))

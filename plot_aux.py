@@ -11,7 +11,31 @@ from itertools import cycle
 from df_aux import *    
 
 
-# 
+def get_plot_defualt_params():
+    default_params = {
+        'y_data': {'default': np.array([])},
+        'x_data': {'default': None},
+        'marker_points': {'default': None},
+        'marker_points_style': {'default': 'o', 'optional': {'o', 'x', 's', 'd', 'ro'}},
+        'marker_style': {'default': None, 'optional': {None, 'o', 'x', 's', 'd'}},
+        'line_style': {'default': '-', 'optional': {'-', '--', '-.', ':'}},
+        'x_label': {'default': 'Index'},
+        'y_label': {'default': 'Value'},
+        'xlim': {'default': None},
+        'ylim': {'default': None},
+        'title': {'default': 'Plot of NumPy Array'},
+        'legend': {'default': True, 'optional': {True, False}},
+        'figsize': {'default': None},
+        'color': {'default': 'blue', 'optional': {'blue', 'green', 'red', 'cyan', 'magenta', 'yellow', 'black'}},
+        'ax': {'default': None},
+        'xlabel_fontsize': {'default': 10},
+        'ylabel_fontsize': {'default': 10},
+        'title_fontsize': {'default': 12},
+        'tick_labelsize': {'default': 10}, 
+        'legend_fontsize': {'default': 10},  
+        'legend_loc': {'default': 'upper right', 'optional': {'best', 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'}},
+    }        
+    return default_params      
 
 
 
@@ -36,6 +60,95 @@ from df_aux import *
 #      title='Sine Wave', legend=True, figsize=(10, 5), color='green')
 
 
+
+# def plot(*args, **params):
+#     # Define default and optional values for each parameter in default_params
+#     default_params = get_plot_defualt_params()
+
+#     # Parse params
+#     try:
+#         params = parse_func_params(params, default_params)
+#     except ValueError as e:
+#         print(e)  # Print the exception message with calling stack path
+#         return None
+
+
+
+
+#     # Determine x_data and y_data from args or params
+#     if len(args) == 2:
+#         x_data, y_data = args
+#     elif len(args) == 1:
+#         y_data = args[0]
+#         x_data = params.get('x_data')
+#     else:
+#         y_data = params.get('y_data')
+#         x_data = params.get('x_data')
+
+#     # Use index for x_data if not provided
+#     if x_data is None:
+#         x_data = np.arange(len(y_data))
+#         time_data  = False
+#     else:
+        
+#         time_data = pd.api.types.is_datetime64_any_dtype(x_data)
+#         x_data = np.asarray(x_data)
+#         if len(x_data) != len(y_data):
+#             raise ValueError("Length of x_data must be equal to length of y_data.")
+    
+    
+#     # Ensure y_data is a NumPy array
+#     y_data = np.asarray(y_data)
+    
+#     # Create a figure and axis if ax is not provided
+#     if params['ax'] is None:
+#         fig, ax = plt.subplots(figsize=params['figsize'])
+#     else:
+#         ax = params['ax']
+    
+
+
+    
+#     # Plot the values
+#     line = ax.plot(x_data, y_data, params['line_style'], label='Data', marker=params['marker_style'], color=params['color'])
+    
+    
+#     if time_data:
+#         # plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
+#         # plt.xticks(rotation=45, ha='right', fontsize=8)
+
+#         ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
+#         ax.tick_params(axis='x', rotation=45, labelsize=params['tick_labelsize'], labelright=True)
+#     else:
+#         ax.tick_params(axis='x',labelsize=params['tick_labelsize'], labelright=True)
+
+
+#     # Highlight marker_points if provided
+#     if params['marker_points'] is not None:
+#         ax.plot(x_data[params['marker_points']], y_data[params['marker_points']], params['marker_points_style'], linestyle='None', label='marker_points')
+    
+    
+#     # Set labels and title
+#     ax.set_xlabel(params['x_label'], fontsize=params['xlabel_fontsize'])
+#     ax.set_ylabel(params['y_label'], fontsize=params['ylabel_fontsize'])
+#     ax.set_title(params['title'], fontsize=params['title_fontsize'])
+    
+#     # Set limits if provided
+#     if params['xlim'] is not None:
+#         ax.set_xlim(params['xlim'])
+#     if params['ylim'] is not None:
+#         ax.set_ylim(params['ylim'])
+    
+#     # Add a legend if required
+#     if params['legend']:
+#         ax.legend(params['legend'],fontsize=params['legend_fontsize'],loc=params['legend_loc'])
+
+    
+#     # Show the plot if a new figure was created
+#     if params['ax'] is None:
+#         plt.show()
+
+#     return line
 
 def plot(*args, **params):
     # Define default and optional values for each parameter in default_params
@@ -147,35 +260,134 @@ def plot(*args, **params):
 
     return line
 
+
+# def plot_df_columns(df, **params):
+#     # Define default and optional values for each parameter in default_params
+#     default_params = {
+#         'columns': {'default': None}, 
+#         'x_data_type': {'default': 'index', 'optional': {'index', 'time'}},
+#         'line_styles': {'default': None},  # Adding support for multiple line styles
+#         'pre_process_params': {'default':{}},
+#     }
+
+#     default_params.update(get_plot_defualt_params())
+
+
+
+        
+
+#     plot_df = df.copy()
+#     try:
+#         params = parse_func_params(params, default_params)
+#     except ValueError as e:
+#         print(e)  # Print the exception message with calling stack path
+#         return None
+
+#     # Determine x_data based on x_data_type
+#     if (params['x_data_type']=='index'):
+#         x_data = range(df.shape[0])
+#         x_label = 'index'
+#     elif (params['x_data_type']=='time'):
+#         parse_parameter(params['time_column'],df.columns)
+#         x_data = df[params['time_column']]
+#         x_data = pd.to_datetime(x_data, utc=True)
+#         x_label = 'time'
+
+#     if (isinstance(params['columns'], str)):
+#         params['columns'] = [params['columns']]
+
+#     # Create a figure and axis if ax is not provided
+#     if params['ax'] is None:
+#         fig, ax = plt.subplots(figsize=params['figsize'])
+#     else:
+#         ax = params['ax']
+    
+#     # Generate colors if not provided
+#     num_columns = len(params['columns'])
+#     if params['color'] is None:
+#         colors = create_color_vector(num_columns)
+#     else:
+#         if isinstance(params['color'], str):
+#             colors = cycle([params['color']])
+#         elif len(params['color']) != num_columns:
+#             raise ValueError("Number of colors must match the number of columns")
+#         else:
+#             colors = cycle(params['color'])
+    
+#     # Determine line styles if provided
+#     if params['line_styles'] is None:
+#         line_styles = cycle([params['line_style']] * num_columns)
+#     else:
+#         if len(params['line_styles']) != num_columns:
+#             raise ValueError("Number of line styles must match the number of columns")
+#         else:
+#             line_styles = cycle(params['line_styles'])
+    
+
+#     # pre_proccess
+#     for column in params['columns']: 
+#         pre_process_df_columns_params = params
+#         pre_process_df_columns_params['strict_params']=False  
+#         plot_df = pre_process_df_columns(plot_df,**pre_process_df_columns_params)
+        
+
+#     # Plot each column with its own label for the legend
+#     handles = []
+#     for color, line_style, column in zip(colors, line_styles, params['columns']):
+#         y_data = plot_df[column]
+#         plot_params = {key: value for key, value in params.items() if key not in ['ax', 'columns', 'x_data_type', 'legend_loc', 'line_styles']}
+#         plot_params['color'] = color
+#         plot_params['line_style'] = line_style
+#         plot_params['strict_params'] = False
+#         handle = plot(x_data=x_data, y_data=y_data, ax=ax, **plot_params, label=column)
+#         handles.append(handle)
+    
+#     # Set labels and title
+#     ax.set_xlabel(x_label)
+#     ax.set_ylabel(params['y_label'])
+#     ax.set_title(params['title'])
+    
+#     # Set limits if provided
+#     if params['xlim'] is not None:
+#         ax.set_xlim(params['xlim'])
+#     if params['ylim'] is not None:
+#         ax.set_ylim(params['ylim'])
+    
+#     # Add a legend if required
+#     if params['legend']:
+#         ax.legend(params['columns'], fontsize=params['legend_fontsize'],loc=params['legend_loc'])
+        
+    
+#     # Show the plot if a new figure was created
+#     if params['ax'] is None:
+#         plt.show()
+    
+#     return ax   
+
 def plot_df_columns(df, **params):
     # Define default and optional values for each parameter in default_params
-    default_params = get_plot_defualt_params()
+    default_params = {
+        'columns': {'default': None},
+        'x_data_type': {'default': 'index', 'optional': {'index', 'time'}},
+        'marker_points': {'default': None},
+        'marker_points_style': {'default': 'o', 'optional': {'o', 'x', 's', 'd', 'ro'}},
+        'marker_style': {'default': None, 'optional': {None, 'o', 'x', 's', 'd'}},
+        'line_style': {'default': '-', 'optional': {'-', '--', '-.', ':'}},
+        'line_styles': {'default': None},  # Adding support for multiple line styles
+        'x_label': {'default': 'Index'},
+        'y_label': {'default': 'Value'},
+        'xlim': {'default': None},
+        'ylim': {'default': None},
+        'title': {'default': 'Plot of Data'},
+        'legend': {'default': True, 'optional': {True, False}},
+        'legend_loc': {'default': 'upper right', 'optional': {'best', 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'}},
+        'figsize': {'default': None},
+        'color': {'default': None},
+        'time_column':'time',
+        'ax': {'default': None},
+        'pre_process_params': {'default':{}}
 
-    def get_plot_defualt_params():
-        default_params = {
-            'y_data': {'default': np.array([])},
-            'x_data': {'default': None},
-            'marker_points': {'default': None},
-            'marker_points_style': {'default': 'o', 'optional': {'o', 'x', 's', 'd', 'ro'}},
-            'marker_style': {'default': None, 'optional': {None, 'o', 'x', 's', 'd'}},
-            'line_style': {'default': '-', 'optional': {'-', '--', '-.', ':'}},
-            'x_label': {'default': 'Index'},
-            'y_label': {'default': 'Value'},
-            'xlim': {'default': None},
-            'ylim': {'default': None},
-            'title': {'default': 'Plot of NumPy Array'},
-            'legend': {'default': True, 'optional': {True, False}},
-            'figsize': {'default': None},
-            'color': {'default': 'blue', 'optional': {'blue', 'green', 'red', 'cyan', 'magenta', 'yellow', 'black'}},
-            'ax': {'default': None},
-            'xlabel_fontsize': {'default': 10},
-            'ylabel_fontsize': {'default': 10},
-            'title_fontsize': {'default': 12},
-            'tick_labelsize': {'default': 10}, 
-            'legend_fontsize': {'default': 10},  
-        return default_params      
     }
-        
 
     plot_df = df.copy()
     try:
@@ -263,6 +475,7 @@ def plot_df_columns(df, **params):
         plt.show()
     
     return ax   
+
 
 
 

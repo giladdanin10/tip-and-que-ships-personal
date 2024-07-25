@@ -326,29 +326,21 @@ class SHIPS:
 
 
     def plot_ship_data(self,ship_names,**params):
-        default_params = {
+        default_params = get_plot_defualt_params()
+
+
+        default_params.update({
             'columns': {'default': ['latitude','longitude','time_seconds']},
             'x_data_type': {'default': 'index', 'optional': {'index', 'time'}},
-            'marker_points': {'default': None},
-            'marker_points_style': {'default': 'o', 'optional': {'o', 'x', 's', 'd', 'ro'}},
-            'marker_style': {'default': None, 'optional': {None, 'o', 'x', 's', 'd'}},
-            'line_style': {'default': '-', 'optional': {'-', '--', '-.', ':'}},
-            'line_styles': {'default': None},  # Adding support for multiple line styles
-            'x_label': {'default': 'Index'},
-            'y_label': {'default': 'Value'},
-            'xlim': {'default': None},
-            'ylim': {'default': None},
-            'title': {'default': 'Plot of Data'},
-            'legend': {'default': True, 'optional': {True, False}},
-            'legend_loc': {'default': 'upper right', 'optional': {'best', 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'}},
-            'figsize': {'default': None},
-            'color': {'default': None},
             'time_column':'time',
             'axes_size':None,
             'sort_columns': 'time',
             'pre_process_params': {'default':{}},
             'max_plot_ships': {'default': 16},
-        }
+            'color': None,
+        })
+
+
         try:
             params = parse_func_params(params, default_params)
         except ValueError as e:

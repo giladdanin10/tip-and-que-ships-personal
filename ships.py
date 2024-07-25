@@ -16,6 +16,7 @@ import sys
 from IPython.display import display
 from parse_aux import *
 from plot_aux import *
+from str_aux import *
 
 
 
@@ -30,7 +31,7 @@ class SHIPS:
         self.info_df = []
         self.lines_removed = []
         self.save_folder = save_folder
-        
+        self.fresh_data_set = True        
 
     def load_raw_data(self, input_csv_file_name_full, reload_level=0,save_folder = './pkl'):
         print ('load_row_data')
@@ -68,6 +69,7 @@ class SHIPS:
 # filtered df        
         if (reload_level>=2) and os.path.exists(df_filt_file_name):
             df,status = load_df_from_file(df_filt_file_name)
+            self.fresh_data_set = False
             return df
         else:
             if (df is None):
@@ -113,12 +115,15 @@ class SHIPS:
             for column in float_numerical_columns:
                 df[column] = df[column].apply(convert_to_float)
 
-
-        status = save_var(df,file_name=df_filt_file_name,var_name='df')              
+    # modify ship names
+            df = self.modify_ship_names(df)
+            status = save_var(df,file_name=df_filt_file_name,var_name='df')              
 
         return df
 
-
+    def modify_ship_names(self,df):
+        df['name'] = df['name'].apply(lambda x: replace_char_with_count(x, '@'))
+        return  df
 
 
     def check_pkl_files_exists(self,save_folder = './pkl'):
@@ -137,7 +142,7 @@ class SHIPS:
     def get_ship_df(self,ship_name,**params):
         default_params = {
             'item_type': {'default': 'name', 'optional': {'name','mmsi'}},
-            'sort_columns':{'default':None},
+            'sort_columns':{'default':'time'},
             'handle_common_time_rows': {'default': True},
             'modify_data_dic': {'default': True},
             'reprocess':False
@@ -147,13 +152,15 @@ class SHIPS:
 
         
         ship_df = self.data_dic[ship_name]
-        
+
+        if (params['sort_columns'] is not None):
+            parse_parameter(params['sort_columns'],ship_df.columns)        
+
+            ship_df = ship_df.sort_values(by=params['sort_columns'])
+
+
+
         if (not self.info_df.loc[ship_name,'processed']) or (params['reprocess']):
-            if (params['sort_columns'] is not None):
-                parse_parameter(params['sort_columns'],ship_df.columns)        
-
-                ship_df = ship_df.sort_values(by=params['sort_columns'])
-
 
             if (params['handle_common_time_rows']):
                 ship_df = handle_common_time_rows_in_df(ship_df,ID_columns=params['item_type'],time_column='static_timestamp')
@@ -239,7 +246,7 @@ class SHIPS:
             return None
 
 
-        if (params['reset']):  
+        if (params['reset'] or self.fresh_data_set==True):  
             self.info_df = pd.DataFrame(index=self.data_dic.keys())
             self.info_df['processed'] = False
 
@@ -337,8 +344,8 @@ class SHIPS:
             'figsize': {'default': None},
             'color': {'default': None},
             'time_column':'time',
-            'axes_size_base':(3, 2),
-            'sort_columms': None,
+            'axes_size':None,
+            'sort_columns': 'time',
             'pre_process_params': {'default':{}},
             'max_plot_ships': {'default': 16},
         }
@@ -347,10 +354,8 @@ class SHIPS:
         except ValueError as e:
             print(e)  # Print the exception message with calling stack path
             return None
-
-        if (params['x_data_type'] == 'time'):
-            temp = (params['axes_size'][0]*1.1,params['axes_size'][1]*1.3)
-            params['axes_size'] = temp
+        
+      
         
 
         if isinstance(ship_names,pd.Index):
@@ -371,7 +376,23 @@ class SHIPS:
         num_cols = min(4, num_plot_ships)
         num_rows = (num_plot_ships + num_cols - 1) // num_cols  # Ceiling division to ensure all axes fit
 
-        params['axes_size'] = (params['axes_size_base'][0]*4/num_cols,params['axes_size_base'][1]*4/num_cols)
+
+        if (params['axes_size'] is None):
+            if (num_cols==1):
+                params['axes_size']=(6, 6/3*2)
+            elif (num_cols==2):
+                params['axes_size'] = (4, 4/3*2)
+            elif (num_cols==3):
+                params['axes_size']=(3.5, 3.5/3*2)
+            elif (num_cols==4):
+                params['axes_size'] = (3, 2)
+
+# extend the axes size if time is used
+        if (params['x_data_type'] == 'time'):
+            temp = (params['axes_size'][0]*1.1,params['axes_size'][1]*1.3)
+            params['axes_size'] = temp
+
+        
 
 
         fig, axes,num_rows,num_cols = create_subplot_scheme(axes_size=params['axes_size'], num_axes=num_plot_ships)
@@ -484,7 +505,7 @@ class SHIPS:
         self.info_df['processed'] = False
 
         
-
+        return self.data_dic
     #         good_list = []
     # # make complete missing data at lines containing nans at certain colums
     #         if (vessel_names is None):

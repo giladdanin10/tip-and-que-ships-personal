@@ -54,7 +54,12 @@ def plot(*args, **params):
         'legend': {'default': True, 'optional': {True, False}},
         'figsize': {'default': None},
         'color': {'default': 'blue', 'optional': {'blue', 'green', 'red', 'cyan', 'magenta', 'yellow', 'black'}},
-        'ax': {'default': None}
+        'ax': {'default': None},
+        'xlabel_fontsize': {'default': 10},
+        'ylabel_fontsize': {'default': 10},
+        'title_fontsize': {'default': 12},
+        'tick_labelsize': {'default': 10}, 
+        'legend_fontsize': {'default': 10},        
     }
 
     # Parse params
@@ -110,7 +115,10 @@ def plot(*args, **params):
         # plt.xticks(rotation=45, ha='right', fontsize=8)
 
         ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
-        ax.tick_params(axis='x', rotation=45, labelsize=8, labelright=True)
+        ax.tick_params(axis='x', rotation=45, labelsize=params['tick_labelsize'], labelright=True)
+    else:
+        ax.tick_params(axis='x',labelsize=params['tick_labelsize'], labelright=True)
+
 
     # Highlight marker_points if provided
     if params['marker_points'] is not None:
@@ -118,9 +126,9 @@ def plot(*args, **params):
     
     
     # Set labels and title
-    ax.set_xlabel(params['x_label'])
-    ax.set_ylabel(params['y_label'])
-    ax.set_title(params['title'])
+    ax.set_xlabel(params['x_label'], fontsize=params['xlabel_fontsize'])
+    ax.set_ylabel(params['y_label'], fontsize=params['ylabel_fontsize'])
+    ax.set_title(params['title'], fontsize=params['title_fontsize'])
     
     # Set limits if provided
     if params['xlim'] is not None:
@@ -130,7 +138,8 @@ def plot(*args, **params):
     
     # Add a legend if required
     if params['legend']:
-        ax.legend()
+        ax.legend(fontsize=params['legend_fontsize'])
+
     
     # Show the plot if a new figure was created
     if params['ax'] is None:
@@ -140,28 +149,33 @@ def plot(*args, **params):
 
 def plot_df_columns(df, **params):
     # Define default and optional values for each parameter in default_params
-    default_params = {
-        'columns': {'default': None},
-        'x_data_type': {'default': 'index', 'optional': {'index', 'time'}},
-        'marker_points': {'default': None},
-        'marker_points_style': {'default': 'o', 'optional': {'o', 'x', 's', 'd', 'ro'}},
-        'marker_style': {'default': None, 'optional': {None, 'o', 'x', 's', 'd'}},
-        'line_style': {'default': '-', 'optional': {'-', '--', '-.', ':'}},
-        'line_styles': {'default': None},  # Adding support for multiple line styles
-        'x_label': {'default': 'Index'},
-        'y_label': {'default': 'Value'},
-        'xlim': {'default': None},
-        'ylim': {'default': None},
-        'title': {'default': 'Plot of Data'},
-        'legend': {'default': True, 'optional': {True, False}},
-        'legend_loc': {'default': 'upper right', 'optional': {'best', 'upper right', 'upper left', 'lower left', 'lower right', 'right', 'center left', 'center right', 'lower center', 'upper center', 'center'}},
-        'figsize': {'default': None},
-        'color': {'default': None},
-        'time_column':'time',
-        'ax': {'default': None},
-        'pre_process_params': {'default':{}}
+    default_params = get_plot_defualt_params()
 
+    def get_plot_defualt_params():
+        default_params = {
+            'y_data': {'default': np.array([])},
+            'x_data': {'default': None},
+            'marker_points': {'default': None},
+            'marker_points_style': {'default': 'o', 'optional': {'o', 'x', 's', 'd', 'ro'}},
+            'marker_style': {'default': None, 'optional': {None, 'o', 'x', 's', 'd'}},
+            'line_style': {'default': '-', 'optional': {'-', '--', '-.', ':'}},
+            'x_label': {'default': 'Index'},
+            'y_label': {'default': 'Value'},
+            'xlim': {'default': None},
+            'ylim': {'default': None},
+            'title': {'default': 'Plot of NumPy Array'},
+            'legend': {'default': True, 'optional': {True, False}},
+            'figsize': {'default': None},
+            'color': {'default': 'blue', 'optional': {'blue', 'green', 'red', 'cyan', 'magenta', 'yellow', 'black'}},
+            'ax': {'default': None},
+            'xlabel_fontsize': {'default': 10},
+            'ylabel_fontsize': {'default': 10},
+            'title_fontsize': {'default': 12},
+            'tick_labelsize': {'default': 10}, 
+            'legend_fontsize': {'default': 10},  
+        return default_params      
     }
+        
 
     plot_df = df.copy()
     try:
@@ -266,7 +280,7 @@ def create_color_vector(num_colors):
     return color_vector
 
 
-def create_subplot_scheme(axes_size=(5, 2), num_axes=1, max_axes_in_row=4):
+def create_subplot_scheme(axes_size=None, num_axes=1, max_axes_in_row=4):
     """
     Creates a subplot scheme and returns an array of axes.
 
@@ -292,6 +306,19 @@ def create_subplot_scheme(axes_size=(5, 2), num_axes=1, max_axes_in_row=4):
     # Calculate the number of rows and columns
     num_cols = min(max_axes_in_row, num_axes)
     num_rows = (num_axes + num_cols - 1) // num_cols  # Ceiling division to ensure all axes fit
+
+    if (axes_size is None):
+        if (num_cols==1):
+            axes_size=(6, 6/3*2)
+        elif (num_cols==2):
+            axes_size = (4, 4/3*2)
+        elif (num_cols==3):
+            axes_size=(3.5, 3.5/3*2)
+        elif (num_cols==4):
+            axes_size = (3, 2)
+
+
+
 
     # Calculate figure size based on individual axes size
     fig_width = axes_size[0] * num_cols
